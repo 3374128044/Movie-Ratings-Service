@@ -1,12 +1,13 @@
 from flask import Flask, request, jsonify
 import jwt
-from datetime import datetime, timedelta
+
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movies.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movies.db' #temporary
 app.config['SECRET_KEY'] = '3zZYv0zSwYG8MaV4'
 db = SQLAlchemy(app)
  
@@ -34,20 +35,22 @@ class Rating(db.Model):
 with app.app_context():
     db.create_all()
 
+#decorator method to make sure endpoints are jwt protected
 def token_required(func):
     @wraps(func)
     def decorated(*args, **kwargs):
-        token = request/args.get('token')
+        token = request.args.get('token')
         if not token:
-            return jsonify({'Alert!': "Token missing!"}), 401
+            return jsonify({'Alert!': "Token missing!"}), 403
         try:
-            payload = jwt.decode(token, app.config['SECRET_KEY'])
+            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms= ['HS512', 'HS256'])
             current_user = User.query.filter_by(id=payload['user_id']).first()
         except:
-            return jsonify({'Alert!': "Invalid token!"}), 401
+            return jsonify({'Alert!': "Invalid token!"}), 403
         return func(current_user, *args, **kwargs)
     return decorated
 
+#decorator method to make sure admin only endpoints are only accessed by admin
 def admin_required(func):
     @wraps(func)
     def decorated(current_user, *args, **kwargs):
@@ -60,9 +63,10 @@ def admin_required(func):
 def register_user():
     username = request.json.get("username", None)
     password = request.json.get("password", None)
+    role = request.json.get("role", "user") #user is default role
     if username == None:
         return jsonify({"message" : "Username is required!"}), 404
-    new_user = User(username=username, password=password, role=request.json.get('role', 'user')) #user is default role
+    new_user = User(username=username, password=password, role=role) 
     db.session.add(new_user)
     db.session.commit()
     return jsonify({"message" : "User registered successfully!"}), 201
@@ -73,7 +77,7 @@ def login():
     if(user and user.password == request.json.get('password', None)):
         token = jwt.encode({
             'user_id': user.id,
-            'expiration': str(datetime.utcnow() + timedelta(seconds=120))
+            'expiration': str(datetime.now(timezone.utc) + timedelta(seconds=120))
         }, app.config['SECRET_KEY'])
         return jsonify({"token" : token}), 200
     else:
