@@ -1,2 +1,0 @@
-# user registration
-# login
