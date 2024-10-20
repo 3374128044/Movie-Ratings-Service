@@ -60,6 +60,7 @@ def admin_required(func):
         return func(current_user, *args, **kwargs)
     return decorated
 
+
 @app.route('/register', methods=['POST'])
 def register_user():
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
@@ -115,6 +116,26 @@ def add_movie(current_user):
     db.session.commit()
 
     return jsonify({"message": "Movie added successfully!"}), 201
+
+@app.route('/movies/rate/<int:movie_id>', methods=['POST'])
+@token_required
+
+def submit_rating(current_user, movie_id):
+    movie = Movie.query.filter_by(id=movie_id).first()
+    if not movie:
+        jsonify({"message" : "Unable find movie with movie id: %s!" %movie_id}), 409
+    rating = Rating.query.filter_by(movie_id=movie.id).first()
+    if rating:
+        jsonify({"message" : "You have already submit a rating for this movie!"}), 400
+    rating_score = request.json.get("rating", None)
+    if rating_score == None or not isinstance(rating_score, float):
+        jsonify({"message" : "Please input a valid rating!"}), 404
+    new_rating = Rating(movie_id=movie_id, user_id=current_user.id, rating=rating_score)
+    db.session.add(new_rating)
+    db.session.commit()
+    return jsonify({"message": "Successfully submitted rating for %s" %movie.title})
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
