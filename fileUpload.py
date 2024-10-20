@@ -1,10 +1,12 @@
 from flask import Flask, request, jsonify
 import os
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 10*1024 * 1024
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -27,13 +29,14 @@ def upload_file():
 
     if file.filename == "":
         return jsonify({"message": "No file selected for uploading"}), 400
-    
-    if not is_allowed_extension(file.filename):
-        return jsonify({"message":"File type not supported"}),400
 
-    if file and is_allowed_extension(file.filename):
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-        return jsonify({"message": f"File '{file.filename}' uploaded successfully!"}), 200
+    filename = secure_filename(file.filename)
+    if file and is_allowed_extension(filename):
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        return jsonify({"message": f"File '{filename}' uploaded successfully!"}), 200
+    else:
+        return jsonify({"message": "File type not supported"}), 400
 
 
 if __name__ == '__main__':
