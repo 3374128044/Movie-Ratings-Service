@@ -111,7 +111,7 @@ def login():
 @app.route('/movies/add', methods=['POST'])
 @token_required
 @admin_required
-def add_movie():
+def add_movie(current_user):
     title = request.json.get("title", None)
     description = request.json.get("description", "")
 
@@ -200,7 +200,7 @@ def update_rating(current_user, movie_id):
 @app.route('/movies/ratings/admin-delete/<int:rating_id>', methods=['DELETE'])
 @token_required
 @admin_required
-def delete_rating_admin_only(rating_id):
+def delete_rating_admin_only(current_user,rating_id):
     rating = Rating.query.filter_by(id=rating_id).first()
     if rating:
         db.session.delete(rating)
