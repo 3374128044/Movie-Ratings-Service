@@ -8,19 +8,20 @@ UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 10*1024 * 1024
 
+# create path if not exist
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 ALLOW_EXTENSION = {'txt', 'pdf', 'doc', 'docx'}
 
-
+# check if the file type is allowed
 def is_allowed_extension(filename):
     extension = filename.split('.')[-1]
     extension = extension.lower()
 
     return extension in ALLOW_EXTENSION
 
-
+# upload file
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -30,6 +31,7 @@ def upload_file():
     if file.filename == "":
         return jsonify({"message": "No file selected for uploading"}), 400
 
+    # use secure filename
     filename = secure_filename(file.filename)
     if file and is_allowed_extension(filename):
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
