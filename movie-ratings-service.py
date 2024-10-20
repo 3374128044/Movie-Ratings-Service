@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 import jwt
-
+import re
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
@@ -16,6 +16,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
     role = db.Column(db.String(50), default='user')
 
 class Movie(db.Model):
@@ -59,14 +60,36 @@ def admin_required(func):
         return func(current_user, *args, **kwargs)
     return decorated
 
+def user_only(func):
+    @wraps(func)
+    def decorated(current_user, *args, **kwargs):
+        if current_user.role != 'user':
+            return jsonify({"message" : "This is for users only!"}), 403
+        return func(current_user, *args, **kwargs)
+    return decorated
+
 @app.route('/register', methods=['POST'])
 def register_user():
+    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+
     username = request.json.get("username", None)
     password = request.json.get("password", None)
+    email = request.json.get("email", None)
+
     role = request.json.get("role", "user") #user is default role
     if username == None:
         return jsonify({"message" : "Username is required!"}), 404
-    new_user = User(username=username, password=password, role=role) 
+    elif User.query.filter_by(username=username).first():
+        return jsonify({"message" : "Username already exists!"}), 409
+    
+    if email == None:
+        return jsonify({"message" : "Email is required!"}), 404
+    elif re.match(email_regex, email) == None:
+        return jsonify({"message" : "Invalid email format!"}), 409
+    elif User.query.filter_by(email=email).first():
+        return jsonify({"message" : "Email already exists!"}), 409
+    
+    new_user = User(username=username, password=password, email=email, role=role) 
     db.session.add(new_user)
     db.session.commit()
     return jsonify({"message" : "User registered successfully!"}), 201
@@ -74,14 +97,129 @@ def register_user():
 @app.route('/login', methods=['POST'])
 def login():
     user = User.query.filter_by(username=request.json.get('username', None)).first()
-    if(user and user.password == request.json.get('password', None)):
+    email = User.query.filter_by(email=request.json.get('email', None)).first()
+    if(user and email and user.password == request.json.get('password', None)):
         token = jwt.encode({
             'user_id': user.id,
             'expiration': str(datetime.now(timezone.utc) + timedelta(seconds=120))
         }, app.config['SECRET_KEY'])
         return jsonify({"token" : token}), 200
     else:
-        return jsonify({"message" : "Username or password was incorrect."}), 401
+        return jsonify({"message" : "Invalid credentials"}), 401
+
+#admins endpoint to add a new movie
+@app.route('/movies/add', methods=['POST'])
+@token_required
+@admin_required
+def add_movie(current_user):
+    title = request.json.get("title", None)
+    description = request.json.get("description", "")
+
+    if not title:
+        return jsonify({"message": "Movie title is required!"}), 400
+
+    new_movie = Movie(title=title, description=description)
+    db.session.add(new_movie)
+    db.session.commit()
+
+    return jsonify({"message": "Movie added successfully!"}), 201
+
+@app.route('/movies/ratings/submit/<int:movie_id>', methods=['POST'])
+@token_required
+@user_only
+def submit_rating(current_user, movie_id):
+    movie = Movie.query.filter_by(id=movie_id).first()
+    if not movie:
+        return jsonify({"message" : "Unable find movie with movie id: %s!" %movie_id}), 409
+    rating = Rating.query.filter_by(movie_id=movie.id, user_id=current_user.id).first()
+    if rating:
+        return jsonify({"message" : "You have already submit a rating for this movie!"}), 400
+    rating_score = request.json.get("rating", None)
+    if rating_score == None or not isinstance(rating_score, (int, float)):
+        return jsonify({"message" : "Please input a valid rating!"}), 404
+    new_rating = Rating(movie_id=movie_id, user_id=current_user.id, rating=rating_score)
+    db.session.add(new_rating)
+    db.session.commit()
+    return jsonify({"message": "Successfully submitted rating for %s" %movie.title})
+
+@app.route('/movies/ratings', methods=['GET'])
+def get_movie_ratings():
+    # Query to retrieve movie IDs, titles, descriptions, and their average ratings
+    ratings = db.session.query(
+        Movie.id,  # Include movie ID
+        Movie.title,
+        Movie.description,
+        db.func.avg(Rating.rating).label('average_rating')  # Calculate average rating
+    ).join(Rating, Movie.id == Rating.movie_id).group_by(Movie.id).all()  # Group by Movie.id 
+
+    response = [
+        {
+            'id': movie_id,  # Add movie ID to the response
+            'movie': movie_title,
+            'plot': movie_description,
+            'overall_rating': round(average_rating, 1)  # Round average rating to 1 decimal point
+        }
+        for movie_id, movie_title, movie_description, average_rating in ratings
+    ]
+    return jsonify(response)
+
+@app.route('/movies/<movie_id>', methods=['GET'])
+def get_movie_details(movie_id):
+    # Fetch the movie details
+    movie = Movie.query.get(movie_id)
+    if not movie:
+        return jsonify({'error': 'Movie not found'}), 404   # Error handling
+
+    # Fetch the ratings for this movie
+    ratings = Rating.query.filter_by(movie_id=movie.id).all()
+    user_ratings = [{'user_id': rating.user_id, 'rating': rating.rating} for rating in ratings]
+
+    response = {
+        'id': movie.id,
+        'movie': movie.title,
+        'plot': movie.description,
+        'ratings': user_ratings
+    }
+    return jsonify(response), 200
+
+
+@app.route('/movies/ratings/update/<int:movie_id>', methods=['PUT'])
+@token_required
+@user_only
+def update_rating(current_user, movie_id):
+    rating_to_update = Rating.query.filter_by(movie_id=movie_id, user_id=current_user.id).first()
+    if rating_to_update:
+        new_rating = request.json.get("rating", None)
+        if new_rating == None or not isinstance(new_rating, (int, float)):
+            return jsonify({"message" : "Please input a valid rating!"}), 404
+        rating_to_update.rating = new_rating
+        return jsonify({"message" : "Successfully updated rating!"})
+    else:
+        return jsonify({"message" : "Unable find rating!"}), 409
+
+@app.route('/movies/ratings/admin-delete/<int:rating_id>', methods=['DELETE'])
+@token_required
+@admin_required
+def delete_rating_admin_only(rating_id):
+    rating = Rating.query.filter_by(id=rating_id).first()
+    if rating:
+        db.session.delete(rating)
+        db.session.commit()
+        return jsonify({"message": "Rating deleted successfully!"}), 200
+    else:
+        return jsonify({"message": "Unable find rating!"}), 404
+
+@app.route('/movies/ratings/user-delete/<int:movie_id>', methods=['DELETE'])
+@token_required
+@user_only
+def delete_rating_user_only(current_user, movie_id):
+    rating = Rating.query.filter_by(movie_id=movie_id, user_id=current_user.id).first()
+    if rating:
+        db.session.delete(rating)
+        db.session.commit()
+        return jsonify({"message": "Your rating has been deleted!"}), 200
+    else:
+        return jsonify({"message": "Unable find rating!"}), 404
 
 if __name__ == '__main__':
     app.run(debug=True)
