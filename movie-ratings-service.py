@@ -197,11 +197,11 @@ def update_rating(current_user, movie_id):
     else:
         return jsonify({"message" : "Unable find rating!"}), 409
 
-@app.route('/movies/ratings/admin-delete/<int:user_id>/<int:rating_id>', methods=['DELETE'])
+@app.route('/movies/ratings/admin-delete/<int:rating_id>', methods=['DELETE'])
 @token_required
 @admin_required
-def delete_rating_admin_only(user_id, rating_id):
-    rating = Rating.query.filter_by(id=rating_id, user_id=user_id).first()
+def delete_rating_admin_only(rating_id):
+    rating = Rating.query.filter_by(id=rating_id).first()
     if rating:
         db.session.delete(rating)
         db.session.commit()
