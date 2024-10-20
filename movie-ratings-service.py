@@ -83,6 +83,23 @@ def login():
     else:
         return jsonify({"message" : "Username or password was incorrect."}), 401
 
+#admins endpoint to add a new movie
+@app.route('/movies', methods=['POST'])
+@token_required
+@admin_required
+def add_movie(current_user):
+    title = request.json.get("title", None)
+    description = request.json.get("description", "")
+
+    if not title:
+        return jsonify({"message": "Movie title is required!"}), 400
+
+    new_movie = Movie(title=title, description=description)
+    db.session.add(new_movie)
+    db.session.commit()
+
+    return jsonify({"message": "Movie added successfully!"}), 201
+
 if __name__ == '__main__':
     app.run(debug=True)
 
