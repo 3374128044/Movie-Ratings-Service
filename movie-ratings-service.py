@@ -60,6 +60,13 @@ def admin_required(func):
         return func(current_user, *args, **kwargs)
     return decorated
 
+def user_only(func):
+    @wraps(func)
+    def decorated(current_user, *args, **kwargs):
+        if current_user.role != 'user':
+            return jsonify({"message" : "This is for users only!"}), 403
+        return func(current_user, *args, **kwargs)
+    return decorated
 
 @app.route('/register', methods=['POST'])
 def register_user():
@@ -101,7 +108,7 @@ def login():
         return jsonify({"message" : "Invalid credentials"}), 401
 
 #admins endpoint to add a new movie
-@app.route('/movies', methods=['POST'])
+@app.route('/movies/add', methods=['POST'])
 @token_required
 @admin_required
 def add_movie(current_user):
@@ -117,25 +124,102 @@ def add_movie(current_user):
 
     return jsonify({"message": "Movie added successfully!"}), 201
 
-@app.route('/movies/rate/<int:movie_id>', methods=['POST'])
+@app.route('/movies/ratings/submit/<int:movie_id>', methods=['POST'])
 @token_required
-
+@user_only
 def submit_rating(current_user, movie_id):
     movie = Movie.query.filter_by(id=movie_id).first()
     if not movie:
-        jsonify({"message" : "Unable find movie with movie id: %s!" %movie_id}), 409
-    rating = Rating.query.filter_by(movie_id=movie.id).first()
+        return jsonify({"message" : "Unable find movie with movie id: %s!" %movie_id}), 409
+    rating = Rating.query.filter_by(movie_id=movie.id, user_id=current_user.id).first()
     if rating:
-        jsonify({"message" : "You have already submit a rating for this movie!"}), 400
+        return jsonify({"message" : "You have already submit a rating for this movie!"}), 400
     rating_score = request.json.get("rating", None)
-    if rating_score == None or not isinstance(rating_score, float):
-        jsonify({"message" : "Please input a valid rating!"}), 404
+    if rating_score == None or not isinstance(rating_score, (int, float)):
+        return jsonify({"message" : "Please input a valid rating!"}), 404
     new_rating = Rating(movie_id=movie_id, user_id=current_user.id, rating=rating_score)
     db.session.add(new_rating)
     db.session.commit()
     return jsonify({"message": "Successfully submitted rating for %s" %movie.title})
 
+@app.route('/movies/ratings', methods=['GET'])
+def get_movie_ratings():
+    # Query to retrieve movie IDs, titles, descriptions, and their average ratings
+    ratings = db.session.query(
+        Movie.id,  # Include movie ID
+        Movie.title,
+        Movie.description,
+        db.func.avg(Rating.rating).label('average_rating')  # Calculate average rating
+    ).join(Rating, Movie.id == Rating.movie_id).group_by(Movie.id).all()  # Group by Movie.id 
 
+    response = [
+        {
+            'id': movie_id,  # Add movie ID to the response
+            'movie': movie_title,
+            'plot': movie_description,
+            'overall_rating': round(average_rating, 1)  # Round average rating to 1 decimal point
+        }
+        for movie_id, movie_title, movie_description, average_rating in ratings
+    ]
+    return jsonify(response)
+
+@app.route('/movies/<movie_id>', methods=['GET'])
+def get_movie_details(movie_id):
+    # Fetch the movie details
+    movie = Movie.query.get(movie_id)
+    if not movie:
+        return jsonify({'error': 'Movie not found'}), 404   # Error handling
+
+    # Fetch the ratings for this movie
+    ratings = Rating.query.filter_by(movie_id=movie.id).all()
+    user_ratings = [{'user_id': rating.user_id, 'rating': rating.rating} for rating in ratings]
+
+    response = {
+        'id': movie.id,
+        'movie': movie.title,
+        'plot': movie.description,
+        'ratings': user_ratings
+    }
+    return jsonify(response), 200
+
+
+@app.route('/movies/ratings/update/<int:movie_id>', methods=['PUT'])
+@token_required
+@user_only
+def update_rating(current_user, movie_id):
+    rating_to_update = Rating.query.filter_by(movie_id=movie_id, user_id=current_user.id).first()
+    if rating_to_update:
+        new_rating = request.json.get("rating", None)
+        if new_rating == None or not isinstance(new_rating, (int, float)):
+            return jsonify({"message" : "Please input a valid rating!"}), 404
+        rating_to_update.rating = new_rating
+        return jsonify({"message" : "Successfully updated rating!"})
+    else:
+        return jsonify({"message" : "Unable find rating!"}), 409
+
+@app.route('/movies/ratings/admin-delete/<int:rating_id>', methods=['DELETE'])
+@token_required
+@admin_required
+def delete_rating_admin_only(rating_id):
+    rating = Rating.query.filter_by(id=rating_id).first()
+    if rating:
+        db.session.delete(rating)
+        db.session.commit()
+        return jsonify({"message": "Rating deleted successfully!"}), 200
+    else:
+        return jsonify({"message": "Unable find rating!"}), 404
+
+@app.route('/movies/ratings/user-delete/<int:movie_id>', methods=['DELETE'])
+@token_required
+@user_only
+def delete_rating_user_only(current_user, movie_id):
+    rating = Rating.query.filter_by(movie_id=movie_id, user_id=current_user.id).first()
+    if rating:
+        db.session.delete(rating)
+        db.session.commit()
+        return jsonify({"message": "Your rating has been deleted!"}), 200
+    else:
+        return jsonify({"message": "Unable find rating!"}), 404
 
 if __name__ == '__main__':
     app.run(debug=True)
