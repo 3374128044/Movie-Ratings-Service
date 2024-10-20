@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 import jwt
-
+import re
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
@@ -16,6 +16,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(50), default='user')
 
 class Movie(db.Model):
@@ -61,12 +62,26 @@ def admin_required(func):
 
 @app.route('/register', methods=['POST'])
 def register_user():
+    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+
     username = request.json.get("username", None)
     password = request.json.get("password", None)
+    email = request.json.get("email", None)
+
     role = request.json.get("role", "user") #user is default role
     if username == None:
         return jsonify({"message" : "Username is required!"}), 404
-    new_user = User(username=username, password=password, role=role) 
+    elif User.query.filter_by(username=username).first():
+        return jsonify({"message" : "Username already exists!"}), 409
+    
+    if email == None:
+        return jsonify({"message" : "Email is required!"}), 404
+    elif re.match(email_regex, email) == None:
+        return jsonify({"message" : "Invalid email format!"}), 409
+    elif User.query.filter_by(email=email).first():
+        return jsonify({"message" : "Email already exists!"}), 409
+    
+    new_user = User(username=username, password=password, email=email, role=role) 
     db.session.add(new_user)
     db.session.commit()
     return jsonify({"message" : "User registered successfully!"}), 201
@@ -74,14 +89,15 @@ def register_user():
 @app.route('/login', methods=['POST'])
 def login():
     user = User.query.filter_by(username=request.json.get('username', None)).first()
-    if(user and user.password == request.json.get('password', None)):
+    email = User.query.filter_by(email=request.json.get('email', None)).first()
+    if(user and email and user.password == request.json.get('password', None)):
         token = jwt.encode({
             'user_id': user.id,
             'expiration': str(datetime.now(timezone.utc) + timedelta(seconds=120))
         }, app.config['SECRET_KEY'])
         return jsonify({"token" : token}), 200
     else:
-        return jsonify({"message" : "Username or password was incorrect."}), 401
+        return jsonify({"message" : "Invalid credentials"}), 401
 
 #admins endpoint to add a new movie
 @app.route('/movies', methods=['POST'])
