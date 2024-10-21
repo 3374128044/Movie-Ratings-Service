@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 10*1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
 
 # create path if not exist
 if not os.path.exists(UPLOAD_FOLDER):
