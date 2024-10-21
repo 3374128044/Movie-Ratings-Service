@@ -1,7 +1,7 @@
 # Movie-Ratings-Service
 
 **Team members**:<br />
-Samuel Luong<br />
+Samuel Luong 888059979<br />
 Deborah Shaw 885136325<br />
 Qing Gao<br />
 Jose Diaz<br />
