@@ -24,3 +24,12 @@ virtualenv venv
 source venv/bin/activate
 ```
 
+3. Run the Flask app
+```bash
+python movie-rating-service.py
+```
+ or 
+```bash
+python fileUpload.py
+```
+
