@@ -3,7 +3,7 @@
 **Team members**:<br />
 Samuel Luong 888059979<br />
 Deborah Shaw 885136325<br />
-Qing Gao<br />
+Qing Gao 885087676<br />
 Jose Diaz<br />
 
 ## Instruction
