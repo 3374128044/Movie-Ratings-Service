@@ -4,10 +4,14 @@ import re
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movies.db' #temporary
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movies.db' #temporary
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("SQLALCHEMY_DATABASE_URI")
 app.config['SECRET_KEY'] = '3zZYv0zSwYG8MaV4'
 db = SQLAlchemy(app)
  
