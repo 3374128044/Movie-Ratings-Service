@@ -27,11 +27,11 @@ cd Movie-Ratings-Service
 ```
 
 2. activate virtual environment
-# Unix/macOS
+- Unix/macOS
 ```bash
 source .venv/bin/activate
 ```
-# windows
+- windows
 ```bash
 .venv\Scripts\activate
 ```
