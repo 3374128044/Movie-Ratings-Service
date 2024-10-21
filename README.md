@@ -15,7 +15,7 @@ The movie rating servers is an API allows users to sign up, login, and submit ra
 - **pip**: Should be installed with Python
 - **Flask**:  
 ```bash
-     pip install Flask
+pip install Flask
 ```
 
 1. clone the repository: 
