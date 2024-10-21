@@ -60,6 +60,7 @@ def admin_required(func):
         return func(current_user, *args, **kwargs)
     return decorated
 
+# Decorator that restricts access to a view function for users only.
 def user_only(func):
     @wraps(func)
     def decorated(current_user, *args, **kwargs):
@@ -68,6 +69,7 @@ def user_only(func):
         return func(current_user, *args, **kwargs)
     return decorated
 
+# Registers a new user in the system.
 @app.route('/register', methods=['POST'])
 def register_user():
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
@@ -94,6 +96,7 @@ def register_user():
     db.session.commit()
     return jsonify({"message" : "User registered successfully!"}), 201
 
+# Authenticates a user and generates a JWT token upon successful login.
 @app.route('/login', methods=['POST'])
 def login():
     user = User.query.filter_by(username=request.json.get('username', None)).first()
@@ -124,6 +127,7 @@ def add_movie(current_user):
 
     return jsonify({"message": "Movie added successfully!"}), 201
 
+# Submits a rating for a specified movie by the authenticated user.
 @app.route('/movies/ratings/submit/<int:movie_id>', methods=['POST'])
 @token_required
 @user_only
@@ -142,6 +146,7 @@ def submit_rating(current_user, movie_id):
     db.session.commit()
     return jsonify({"message": "Successfully submitted rating for %s" %movie.title})
 
+# Retrieves a list of movies along with their average ratings.
 @app.route('/movies/ratings', methods=['GET'])
 def get_movie_ratings():
     # Query to retrieve movie IDs, titles, descriptions, and their average ratings
@@ -163,6 +168,7 @@ def get_movie_ratings():
     ]
     return jsonify(response)
 
+# Retrieves the details of a specific movie by its ID.
 @app.route('/movies/<movie_id>', methods=['GET'])
 def get_movie_details(movie_id):
     # Fetch the movie details
@@ -182,7 +188,7 @@ def get_movie_details(movie_id):
     }
     return jsonify(response), 200
 
-
+# Users update their own existing ratings based on the rating ID.
 @app.route('/movies/ratings/update/<int:rating_id>', methods=['PUT'])
 @token_required
 @user_only
@@ -198,6 +204,7 @@ def update_rating(current_user, rating_id):
     else:
         return jsonify({"message": "Unable to find rating!"}), 404
 
+# Admin deletes a specified rating from the database by rating ID.
 @app.route('/movies/ratings/admin-delete/<int:rating_id>', methods=['DELETE'])
 @token_required
 @admin_required
@@ -210,6 +217,7 @@ def delete_rating_admin_only(current_user,rating_id):
     else:
         return jsonify({"message": "Unable find rating!"}), 404
 
+# Users delete their own ratings by rating ID.
 @app.route('/movies/ratings/user-delete/<int:rating_id>', methods=['DELETE'])
 @token_required
 @user_only
