@@ -183,20 +183,20 @@ def get_movie_details(movie_id):
     return jsonify(response), 200
 
 
-@app.route('/movies/ratings/update/<int:movie_id>', methods=['PUT'])
+@app.route('/movies/ratings/update/<int:rating_id>', methods=['PUT'])
 @token_required
 @user_only
-def update_rating(current_user, movie_id):
-    rating_to_update = Rating.query.filter_by(movie_id=movie_id, user_id=current_user.id).first()
-    if rating_to_update:
+def update_rating(current_user, rating_id):
+    rating_to_update = Rating.query.get(rating_id)  # Fetch the rating by its ID
+    if rating_to_update and rating_to_update.user_id == current_user.id:  # Check if the rating belongs to the current user
         new_rating = request.json.get("rating", None)
-        if new_rating == None or not isinstance(new_rating, (int, float)):
-            return jsonify({"message" : "Please input a valid rating!"}), 404
+        if new_rating is None or not isinstance(new_rating, (int, float)):
+            return jsonify({"message": "Please input a valid rating!"}), 400
         rating_to_update.rating = new_rating
         db.session.commit()
-        return jsonify({"message" : "Successfully updated rating!"})
+        return jsonify({"message": "Successfully updated rating!"}), 200
     else:
-        return jsonify({"message" : "Unable find rating!"}), 409
+        return jsonify({"message": "Unable to find rating!"}), 404
 
 @app.route('/movies/ratings/admin-delete/<int:rating_id>', methods=['DELETE'])
 @token_required
@@ -210,17 +210,17 @@ def delete_rating_admin_only(current_user,rating_id):
     else:
         return jsonify({"message": "Unable find rating!"}), 404
 
-@app.route('/movies/ratings/user-delete/<int:movie_id>', methods=['DELETE'])
+@app.route('/movies/ratings/user-delete/<int:rating_id>', methods=['DELETE'])
 @token_required
 @user_only
-def delete_rating_user_only(current_user, movie_id):
-    rating = Rating.query.filter_by(movie_id=movie_id, user_id=current_user.id).first()
-    if rating:
+def delete_rating_user_only(current_user, rating_id):
+    rating = Rating.query.get(rating_id)  # Fetch the rating by its ID
+    if rating and rating.user_id == current_user.id:  # Check if the rating belongs to the current user
         db.session.delete(rating)
         db.session.commit()
         return jsonify({"message": "Your rating has been deleted!"}), 200
     else:
-        return jsonify({"message": "Unable find rating!"}), 404
+        return jsonify({"message": "Unable to find rating!"}), 404
 
 if __name__ == '__main__':
     app.run(debug=True)
