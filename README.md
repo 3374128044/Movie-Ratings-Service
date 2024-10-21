@@ -29,6 +29,8 @@ cd Movie-Ratings-Service
 2. Set up virtual environment
 ```bash
 virtualenv venv
+```
+```bash
 source venv/bin/activate
 ```
 
