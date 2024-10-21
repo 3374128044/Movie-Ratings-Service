@@ -26,12 +26,14 @@ git clone https://github.com/3374128044/Movie-Ratings-Service.git
 cd Movie-Ratings-Service
 ```
 
-2. Set up virtual environment
+2. activate virtual environment
+# Unix/macOS
 ```bash
-virtualenv venv
+source .venv/bin/activate
 ```
+# windows
 ```bash
-source venv/bin/activate
+.venv\Scripts\activate
 ```
 
 3. Run the Flask app
