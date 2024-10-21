@@ -12,7 +12,7 @@ app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-ALLOW_EXTENSION = {'txt', 'pdf', 'doc', 'docx'}
+ALLOW_EXTENSION = {'txt', 'pdf', 'doc', 'docx', 'pptx'}
 
 # check if the file type is allowed
 def is_allowed_extension(filename):
@@ -32,11 +32,11 @@ def upload_file():
         return jsonify({"message": "No file selected for uploading"}), 400
 
     # use secure filename
-    filename = secure_filename(file.filename)
-    if file and is_allowed_extension(filename):
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if file and is_allowed_extension(file.filename):
+        file.filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(filepath)
-        return jsonify({"message": f"File '{filename}' uploaded successfully!"}), 200
+        return jsonify({"message": f"File '{file.filename}' uploaded successfully!"}), 200
     else:
         return jsonify({"message": "File type not supported"}), 400
 
