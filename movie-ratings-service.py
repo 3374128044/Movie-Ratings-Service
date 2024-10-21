@@ -193,6 +193,7 @@ def update_rating(current_user, movie_id):
         if new_rating == None or not isinstance(new_rating, (int, float)):
             return jsonify({"message" : "Please input a valid rating!"}), 404
         rating_to_update.rating = new_rating
+        db.session.commit()
         return jsonify({"message" : "Successfully updated rating!"})
     else:
         return jsonify({"message" : "Unable find rating!"}), 409
