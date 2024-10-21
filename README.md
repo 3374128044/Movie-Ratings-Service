@@ -4,7 +4,7 @@
 Samuel Luong 888059979<br />
 Deborah Shaw 885136325<br />
 Qing Gao 885087676<br />
-Jose Diaz<br />
+Jose Diaz 886411032<br />
 
 ## Instruction
 The movie rating servers is an API allows users to sign up, login, and submit rating for movies. Admins can manage movies in the database but are not allowed to submit ratings. JWT authentication ensures secure login and authorization. The service includes features such as adding, updating, retrieving, and deleting movie ratings. Additionally, an API for file uploads supports specific file extensions only.
