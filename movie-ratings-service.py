@@ -76,6 +76,7 @@ def user_only(func):
 # Registers a new user in the system.
 @app.route('/register', methods=['POST'])
 def register_user():
+    # Regular expression for validating email format.
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
 
     username = request.json.get("username", None)
@@ -83,18 +84,22 @@ def register_user():
     email = request.json.get("email", None)
 
     role = request.json.get("role", "user") #user is default role
+    # Check if the username is provided, return an error if not.
     if username == None:
         return jsonify({"message" : "Username is required!"}), 404
+    # Check if the username already exists in the system
     elif User.query.filter_by(username=username).first():
         return jsonify({"message" : "Username already exists!"}), 409
-    
+
+    # Check if the email is provided, return an error if not.
     if email == None:
         return jsonify({"message" : "Email is required!"}), 404
     elif re.match(email_regex, email) == None:
         return jsonify({"message" : "Invalid email format!"}), 409
     elif User.query.filter_by(email=email).first():
         return jsonify({"message" : "Email already exists!"}), 409
-    
+
+    # If all checks pass, create a new user instance with the provided data.
     new_user = User(username=username, password=password, email=email, role=role) 
     db.session.add(new_user)
     db.session.commit()
@@ -103,9 +108,13 @@ def register_user():
 # Authenticates a user and generates a JWT token upon successful login.
 @app.route('/login', methods=['POST'])
 def login():
+    # Query the database for a user with the provided username.
     user = User.query.filter_by(username=request.json.get('username', None)).first()
+    # Query the database for a user with the provided email.
     email = User.query.filter_by(email=request.json.get('email', None)).first()
+    # Check if both the user and email exist, and if the provided password matches the stored password.
     if(user and email and user.password == request.json.get('password', None)):
+        # If credentials are valid, generate a JWT token containing the user's ID and an expiration time (2 minutes).
         token = jwt.encode({
             'user_id': user.id,
             'expiration': str(datetime.now(timezone.utc) + timedelta(seconds=120))
@@ -119,12 +128,14 @@ def login():
 @token_required
 @admin_required
 def add_movie(current_user):
+    # Extract the movie title and description from the incoming JSON request.
     title = request.json.get("title", None)
     description = request.json.get("description", "")
 
     if not title:
         return jsonify({"message": "Movie title is required!"}), 400
 
+    # Create a new movie instance using the provided title and description.
     new_movie = Movie(title=title, description=description)
     db.session.add(new_movie)
     db.session.commit()
@@ -136,15 +147,19 @@ def add_movie(current_user):
 @token_required
 @user_only
 def submit_rating(current_user, movie_id):
+    # Query the database to find the movie with the provided movie_id.
     movie = Movie.query.filter_by(id=movie_id).first()
     if not movie:
         return jsonify({"message" : "Unable find movie with movie id: %s!" %movie_id}), 409
+    # Check if the user has already submitted a rating for this movie.
     rating = Rating.query.filter_by(movie_id=movie.id, user_id=current_user.id).first()
     if rating:
         return jsonify({"message" : "You have already submit a rating for this movie!"}), 400
     rating_score = request.json.get("rating", None)
+    # Validate the rating score; it must be provided and must be a number (integer or float).
     if rating_score == None or not isinstance(rating_score, (int, float)):
         return jsonify({"message" : "Please input a valid rating!"}), 404
+    # Create a new Rating object with the provided movie ID, user ID, and rating score.
     new_rating = Rating(movie_id=movie_id, user_id=current_user.id, rating=rating_score)
     db.session.add(new_rating)
     db.session.commit()
@@ -213,12 +228,15 @@ def update_rating(current_user, rating_id):
 @token_required
 @admin_required
 def delete_rating_admin_only(current_user,rating_id):
+    # Query the database to find the rating with the provided rating_id.
     rating = Rating.query.filter_by(id=rating_id).first()
+    # If the rating is found, delete it from the database.
     if rating:
         db.session.delete(rating)
         db.session.commit()
         return jsonify({"message": "Rating deleted successfully!"}), 200
     else:
+        # If the rating is not found, return a 404 Not Found response.
         return jsonify({"message": "Unable find rating!"}), 404
 
 # Users delete their own ratings by rating ID.
